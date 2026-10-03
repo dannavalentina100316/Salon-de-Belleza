@@ -10,10 +10,17 @@
   },
   "dependencies": {
     "@lucide/vue": "^1.50.0",
-    "vue": "^3.5.42"
+    "@quasar/vite-plugin": "^2.0.2",
+    "axios": "^1.20.0",
+    "pinia": "^4.0.3",
+    "pinia-plugin-persistedstate": "^4.7.1",
+    "quasar": "^2.34.0",
+    "vue": "^3.5.42",
+    "vue-router": "^5.3.1"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.8",
+    "sass-embedded": "^1.105.1",
     "vite": "^8.3.0"
   }
 }
