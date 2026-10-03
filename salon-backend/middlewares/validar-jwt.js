@@ -8,8 +8,12 @@ export const validarJWT = (req, res, next) => {
     return res.status(401).json({ ok: false, msg: 'Token no proporcionado' });
   }
 
+  if (!process.env.JWT_SECRET) {
+    return res.status(500).json({ ok: false, msg: 'JWT_SECRET no configurado' });
+  }
+
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secretKey');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.usuario = decoded;
     next();
   } catch (error) {

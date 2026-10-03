@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 
 import { connectDB } from './config/db.js';
 import authRoutes from './routes/auth.routes.js';
@@ -14,8 +16,30 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3200;
 
-app.use(cors());
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error('Origen no permitido por CORS'));
+  },
+}));
 app.use(express.json());
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
 
 app.get('/', (req, res) => {
   res.json({
@@ -40,7 +64,8 @@ app.use('/api/citas', citaRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({
+  const status = err.message === 'Origen no permitido por CORS' ? 403 : 500;
+  res.status(status).json({
     msg: 'Error interno del servidor',
     error: err.message,
   });
@@ -54,7 +79,11 @@ const startServer = async () => {
   });
 };
 
-startServer().catch((error) => {
-  console.error(`No se pudo iniciar el servidor: ${error.message}`);
-  process.exit(1);
-});
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  startServer().catch((error) => {
+    console.error(`No se pudo iniciar el servidor: ${error.message}`);
+    process.exit(1);
+  });
+}
+
+export default app;
