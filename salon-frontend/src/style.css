@@ -1,0 +1,124 @@
+
+/* ========================================
+   FLORA STUDIO - ESTILOS GENERALES
+======================================== */
+
+:root {
+  font-family: Arial, Helvetica, sans-serif;
+  color: #49373b;
+  background: #fbf7f5;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  --color-primary: #82485b;
+  --color-primary-dark: #663748;
+  --color-pink: #f8e9e9;
+  --color-cream: #fbf7f5;
+  --color-white: #fffdfb;
+  --color-text: #49373b;
+  --color-muted: #9b8589;
+  --color-border: #f0e6e3;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+body,
+button,
+input,
+select,
+textarea {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font-size: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #b77c8e;
+  outline-offset: 3px;
+}
+
+a {
+  color: inherit;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+/* Evita que los formularios se salgan de su contenedor */
+
+input,
+select,
+textarea {
+  max-width: 100%;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+/* Selección de texto */
+
+::selection {
+  background: #f0d5dc;
+  color: #49373b;
+}
+
+/* Barra de desplazamiento */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #fbf7f5;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 10px;
+  background: #ddc4ca;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #bd929f;
+}
+
+/* Ajustes generales para pantallas pequeñas */
+
+@media (max-width: 480px) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
+}
