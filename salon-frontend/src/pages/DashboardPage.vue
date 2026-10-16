@@ -28,9 +28,16 @@
         <h2>Tu espacio de trabajo</h2>
       </div>
 
-      <button class="refresh-button" @click="cargarDatos" :disabled="store.loading">
+      <q-btn
+        class="refresh-button"
+        flat
+        no-caps
+        :ripple="false"
+        :disable="store.loading"
+        @click="cargarDatos"
+      >
         ↻ Actualizar
-      </button>
+      </q-btn>
     </div>
 
     <p v-if="store.error" class="error-message">
@@ -371,12 +378,15 @@ onMounted(cargarDatos)
 }
 
 .refresh-button {
+  min-width: 0;
+  min-height: 0;
   padding: 10px 14px;
   border: 1px solid #eadbdc;
   border-radius: 8px;
   background: #fffdfb;
   color: #805061;
   cursor: pointer;
+  box-shadow: none;
 }
 
 .refresh-button:disabled {

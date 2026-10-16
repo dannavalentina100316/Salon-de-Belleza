@@ -20,6 +20,18 @@ export const salonApi = {
     return api.post('/estilistas', data)
   },
 
+  updateStylist(id, data) {
+    return api.put(`/estilistas/${id}`, data)
+  },
+
+  toggleStylistStatus(id) {
+    return api.patch(`/estilistas/${id}/estado`)
+  },
+
+  deleteStylist(id) {
+    return api.delete(`/estilistas/${id}`)
+  },
+
   // SERVICIOS
   getServices() {
     return api.get('/servicios')
@@ -27,6 +39,10 @@ export const salonApi = {
 
   createService(data) {
     return api.post('/servicios', data)
+  },
+
+  updateService(id, data) {
+    return api.put(`/servicios/${id}`, data)
   },
 
   // CITAS
@@ -37,7 +53,11 @@ export const salonApi = {
   createAppointment(data) {
     return api.post('/citas', data)
   },
+
+  updateAppointmentStatus(id, estado) {
+    return api.patch(`/citas/${id}/estado`, { estado })
+  },
   generarCitasPrueba() {
-  return api.post('/citas/generar-prueba');
-},
+    return api.post('/citas/generar-prueba', undefined, { timeout: 120000 })
+  },
 }

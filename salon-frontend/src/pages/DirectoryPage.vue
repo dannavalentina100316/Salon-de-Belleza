@@ -8,12 +8,13 @@
         <p>{{ configuracion.descripcion }}</p>
       </div>
 
-      <button class="primary-button" @click="abrirFormulario">
-        + Nuevo registro
-      </button>
+        <button class="primary-button" @click="abrirFormulario">
+          + Nuevo registro
+        </button>
     </section>
 
     <p v-if="store.error" class="error-message">{{ store.error }}</p>
+    <p v-if="errorAccionEstilista" class="error-message">{{ errorAccionEstilista }}</p>
     <p v-if="mensaje" class="success-message">{{ mensaje }}</p>
 
     <section class="directory-card">
@@ -43,6 +44,7 @@
               <th v-for="columna in configuracion.columnas" :key="columna.key">
                 {{ columna.label }}
               </th>
+              <th v-if="tipo === 'estilistas'">Acciones</th>
             </tr>
           </thead>
 
@@ -68,6 +70,27 @@
                   {{ valorColumna(registro, columna.key) }}
                 </template>
               </td>
+              <td v-if="tipo === 'estilistas'" class="row-actions">
+                <button type="button" class="table-action" @click="editarEstilista(registro)">
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  class="table-action"
+                  :disabled="accionandoEstilista === (registro._id || registro.id)"
+                  @click="alternarEstadoEstilista(registro)"
+                >
+                  {{ registro.activa === false ? 'Activar' : 'Desactivar' }}
+                </button>
+                <button
+                  type="button"
+                  class="table-action danger-action"
+                  :disabled="accionandoEstilista === (registro._id || registro.id)"
+                  @click="eliminarEstilista(registro)"
+                >
+                  Eliminar
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -88,9 +111,9 @@
         <button class="close-button" type="button" @click="cerrarFormulario">×</button>
 
         <span class="eyebrow">FLORA STUDIO · REGISTROS</span>
-        <h3>{{ configuracion.formularioTitulo }}</h3>
+        <h3>{{ estilistaEditandoId ? 'Editar estilista' : configuracion.formularioTitulo }}</h3>
         <p class="modal-description">{{ configuracion.descripcionFormulario }}</p>
-
+required 
         <form @submit.prevent="guardarRegistro">
           <!-- FORMULARIO DE CLIENTE -->
           <template v-if="tipo === 'clientes'">
@@ -140,44 +163,21 @@
 
           <!-- FORMULARIO DE ESTILISTA -->
           <template v-else-if="tipo === 'estilistas'">
-            <div class="form-row">
-              <label>
-                Nombre
-                <input v-model.trim="formulario.nombre" required maxlength="60" />
-              </label>
-
-              <label>
-                Apellido
-                <input v-model.trim="formulario.apellido" required maxlength="60" />
-              </label>
-            </div>
-
             <label>
-              Cargo o especialidad
-              <select v-model="formulario.cargo" required>
-                <option disabled value="">Selecciona un cargo</option>
-                <option v-for="cargo in cargos" :key="cargo" :value="cargo">
-                  {{ cargo }}
-                </option>
-              </select>
+              Nombre completo
+              <input v-model.trim="formulario.nombre" required maxlength="80" />
             </label>
 
             <label>
-              Teléfono
-<input
-  v-model="formulario.telefono"
-  type="tel"
-  inputmode="numeric"
-  maxlength="10"
-  pattern="[0-9]{10}"
-  placeholder="3001234567"
-  required
-  @input="normalizarTelefono"
-/>            </label>
-
-            <label>
-              Correo electrónico
-              <input v-model.trim="formulario.correo" type="email" required />
+              Teléfono (opcional)
+              <input
+                v-model="formulario.telefono"
+                type="tel"
+                inputmode="numeric"
+                maxlength="10"
+                placeholder="3001234567"
+                @input="normalizarTelefono"
+              />
             </label>
 
             <div class="section-label">
@@ -281,7 +281,7 @@
             </button>
 
             <button type="submit" class="primary-button" :disabled="guardando">
-              {{ guardando ? 'Guardando...' : 'Guardar registro' }}
+              {{ guardando ? 'Guardando...' : estilistaEditandoId ? 'Guardar cambios' : 'Guardar registro' }}
             </button>
           </div>
         </form>
@@ -308,17 +308,10 @@ const busqueda = ref('')
 const mostrarFormulario = ref(false)
 const guardando = ref(false)
 const errorFormulario = ref('')
+const errorAccionEstilista = ref('')
 const mensaje = ref('')
-
-const cargos = [
-  'Estilista capilar',
-  'Colorista',
-  'Manicurista',
-  'Pedicurista',
-  'Maquilladora profesional',
-  'Especialista en tratamientos capilares',
-  'Especialista en cejas y pestañas',
-]
+const estilistaEditandoId = ref('')
+const accionandoEstilista = ref('')
 
 const formulario = reactive({})
 
@@ -341,8 +334,7 @@ const configuraciones = {
     formularioTitulo: 'Nueva estilista',
     descripcionFormulario: 'Completa su información profesional y disponibilidad.',
     columnas: [
-      { key: 'nombreCompleto', label: 'Nombre' },
-      { key: 'cargo', label: 'Cargo' },
+      { key: 'nombre', label: 'Nombre' },
       { key: 'servicios', label: 'Servicios asignados' },
       { key: 'horario', label: 'Horario' },
       { key: 'estado', label: 'Estado' },
@@ -407,10 +399,7 @@ function limpiarFormulario() {
   } else if (props.tipo === 'estilistas') {
     Object.assign(formulario, {
       nombre: '',
-      apellido: '',
-      cargo: '',
       telefono: '',
-      correo: '',
       servicios: [],
       horaInicio: '09:00',
       horaFin: '18:00',
@@ -430,8 +419,60 @@ function limpiarFormulario() {
 function abrirFormulario() {
   errorFormulario.value = ''
   mensaje.value = ''
+  estilistaEditandoId.value = ''
   limpiarFormulario()
   mostrarFormulario.value = true
+}
+
+function editarEstilista(estilista) {
+  errorFormulario.value = ''
+  mensaje.value = ''
+  estilistaEditandoId.value = estilista._id || estilista.id
+  Object.assign(formulario, {
+    nombre: estilista.nombre || '',
+    telefono: estilista.telefono || '',
+    servicios: (estilista.servicios || []).map(servicio =>
+      typeof servicio === 'object' ? servicio._id || servicio.id : servicio,
+    ),
+    horaInicio: estilista.horaInicio || '09:00',
+    horaFin: estilista.horaFin || '18:00',
+    activa: estilista.activa !== false,
+  })
+  mostrarFormulario.value = true
+}
+
+async function alternarEstadoEstilista(estilista) {
+  const id = estilista._id || estilista.id
+  accionandoEstilista.value = id
+  errorAccionEstilista.value = ''
+
+  try {
+    await store.toggleStylistStatus(id)
+    mensaje.value = `${estilista.nombre} ahora está ${estilista.activa === false ? 'activa' : 'inactiva'}.`
+  } catch (error) {
+    errorAccionEstilista.value = error.message || 'No se pudo cambiar el estado.'
+  } finally {
+    accionandoEstilista.value = ''
+  }
+}
+
+async function eliminarEstilista(estilista) {
+  const id = estilista._id || estilista.id
+  if (!window.confirm(`¿Eliminar a ${estilista.nombre}? No se podrá eliminar mientras tenga citas futuras; las citas anteriores conservarán su registro, pero ya no mostrarán su nombre.`)) {
+    return
+  }
+
+  accionandoEstilista.value = id
+  errorAccionEstilista.value = ''
+
+  try {
+    await store.deleteStylist(id)
+    mensaje.value = `${estilista.nombre} fue eliminada.`
+  } catch (error) {
+    errorAccionEstilista.value = error.message || 'No se pudo eliminar la estilista.'
+  } finally {
+    accionandoEstilista.value = ''
+  }
 }
 
 function cerrarFormulario() {
@@ -499,10 +540,7 @@ async function guardarRegistro() {
     return
   }
   
-if (
-  props.tipo === 'clientes' ||
-  props.tipo === 'estilistas'
-) {
+if (props.tipo === 'clientes') {
   if (!/^\d{10}$/.test(formulario.telefono || '')) {
     errorFormulario.value =
       'El teléfono debe contener exactamente 10 dígitos numéricos.'
@@ -527,13 +565,13 @@ if (
   }
 
   if (props.tipo === 'estilistas') {
-    if (!formulario.cargo) {
-      errorFormulario.value = 'Selecciona el cargo de la estilista.'
+    if (!formulario.servicios.length) {
+      errorFormulario.value = 'Asigna al menos un servicio a la estilista.'
       return
     }
 
-    if (!formulario.servicios.length) {
-      errorFormulario.value = 'Asigna al menos un servicio a la estilista.'
+    if (formulario.telefono && !/^\d{10}$/.test(formulario.telefono)) {
+      errorFormulario.value = 'El teléfono debe contener exactamente 10 dígitos.'
       return
     }
 
@@ -572,17 +610,19 @@ if (
         password: formulario.password,
       })
     } else if (props.tipo === 'estilistas') {
-      await store.createStylist({
+      const datosEstilista = {
         nombre: formulario.nombre.trim(),
-        apellido: formulario.apellido.trim(),
-        cargo: formulario.cargo,
         telefono: formulario.telefono.trim(),
-        correo: formulario.correo.trim().toLowerCase(),
         servicios: [...formulario.servicios],
         horaInicio: formulario.horaInicio,
         horaFin: formulario.horaFin,
         activa: formulario.activa,
-      })
+      }
+      if (estilistaEditandoId.value) {
+        await store.updateStylist(estilistaEditandoId.value, datosEstilista)
+      } else {
+        await store.createStylist(datosEstilista)
+      }
     } else {
       await store.createService({
         nombre: formulario.nombre.trim(),
@@ -681,6 +721,34 @@ onMounted(() => {
   border: 1px solid #eadbdc;
   background: #fffdfb;
   color: #805061;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.table-action {
+  padding: 6px 8px;
+  border: 1px solid #eadbdc;
+  border-radius: 6px;
+  background: #fffdfb;
+  color: #805061;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+}
+
+.table-action:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.danger-action {
+  border-color: #f0d4cf;
+  color: #a13e36;
 }
 
 .directory-card {

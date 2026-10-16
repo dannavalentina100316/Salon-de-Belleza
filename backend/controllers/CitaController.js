@@ -185,6 +185,39 @@ export const listarCitas = async (req, res) => {
   }
 };
 
+export const actualizarEstadoCita = async (req, res) => {
+  const estadosPermitidos = ['agendada', 'confirmada', 'cancelada', 'completada'];
+
+  try {
+    const { estado } = req.body;
+    if (!estadosPermitidos.includes(estado)) {
+      return res.status(400).json({
+        mensaje: 'El estado debe ser agendada, confirmada, cancelada o completada.',
+      });
+    }
+
+    const cita = await Cita.findByIdAndUpdate(
+      req.params.id,
+      { estado },
+      { new: true, runValidators: true },
+    );
+
+    if (!cita) {
+      return res.status(404).json({ mensaje: 'No se encontró la cita.' });
+    }
+
+    return res.status(200).json({
+      mensaje: 'El estado de la cita se actualizó correctamente.',
+      cita,
+    });
+  } catch (error) {
+    console.error('Error al actualizar el estado de la cita:', error.message);
+    return res.status(400).json({
+      mensaje: 'No se pudo actualizar el estado de la cita.',
+    });
+  }
+};
+
 export const generarCitasPrueba = async (req, res) => {
   const LIMITE = 200;
   const DIAS = 30;

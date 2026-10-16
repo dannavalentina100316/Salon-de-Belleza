@@ -61,14 +61,44 @@ export const useSalonStore = defineStore('salon', {
       return result
     },
 
+    async updateStylist(id, data) {
+      const result = await salonApi.updateStylist(id, data)
+      await this.loadAll()
+      return result
+    },
+
+    async toggleStylistStatus(id) {
+      const result = await salonApi.toggleStylistStatus(id)
+      await this.loadAll()
+      return result
+    },
+
+    async deleteStylist(id) {
+      const result = await salonApi.deleteStylist(id)
+      await this.loadAll()
+      return result
+    },
+
     async createService(data) {
       const result = await salonApi.createService(data)
       await this.loadAll()
       return result
     },
 
+    async updateService(id, data) {
+      const result = await salonApi.updateService(id, data)
+      await this.loadAll()
+      return result
+    },
+
     async createAppointment(data) {
       const result = await salonApi.createAppointment(data)
+      await this.loadAll()
+      return result
+    },
+
+    async updateAppointmentStatus(id, estado) {
+      const result = await salonApi.updateAppointmentStatus(id, estado)
       await this.loadAll()
       return result
     },

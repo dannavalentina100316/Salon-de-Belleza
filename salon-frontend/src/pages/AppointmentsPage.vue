@@ -9,18 +9,27 @@
       </div>
 
       <div class="heading-actions">
-        <button
+        <q-btn
           class="secondary-button"
+          flat
+          no-caps
+          :ripple="false"
           type="button"
-          :disabled="generando"
+          :disable="generando"
           @click="generarCitas"
         >
           {{ generando ? 'Generando citas...' : 'Generar 200 citas de prueba' }}
-        </button>
+        </q-btn>
 
-        <button class="primary-button" @click="abrirFormulario">
+        <q-btn
+          class="primary-button"
+          unelevated
+          no-caps
+          :ripple="false"
+          @click="abrirFormulario"
+        >
           ＋ Nueva cita
-        </button>
+        </q-btn>
       </div>
     </section>
 
@@ -82,6 +91,7 @@
               <th>Estilista</th>
               <th>Precio</th>
               <th>Estado</th>
+              <th>Actualizar estado</th>
             </tr>
           </thead>
 
@@ -100,7 +110,36 @@
               <td>{{ nombreRelacionado(cita.servicio) }}</td>
               <td>{{ nombreRelacionado(cita.estilista) }}</td>
               <td>{{ mostrarPrecio(cita.precio) }}</td>
-              <td>{{ cita.estado || 'agendada' }}</td>
+              <td>
+                <span :class="['status-badge', `status-${cita.estado || 'agendada'}`]">
+                  {{ etiquetaEstado(cita.estado) }}
+                </span>
+              </td>
+              <td>
+                <div class="status-actions">
+                  <select
+                    class="status-select"
+                    :value="cita.estado || 'agendada'"
+                    :disabled="citaActualizandoId === (cita._id || cita.id)"
+                    aria-label="Cambiar estado de cita"
+                    @change="cambiarEstadoCita(cita, $event.target.value)"
+                  >
+                    <option value="agendada">Agendada</option>
+                    <option value="confirmada">Confirmada</option>
+                    <option value="cancelada">Cancelada</option>
+                    <option value="completada">Realizada</option>
+                  </select>
+                  <button
+                    v-if="['cancelada', 'completada'].includes(cita.estado)"
+                    type="button"
+                    class="reopen-button"
+                    :disabled="citaActualizandoId === (cita._id || cita.id)"
+                    @click="cambiarEstadoCita(cita, 'agendada')"
+                  >
+                    {{ citaActualizandoId === (cita._id || cita.id) ? 'Reabriendo...' : 'Reabrir cita' }}
+                  </button>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -251,7 +290,7 @@
             <select
               v-model="formulario.servicio"
               required
-              @change="formulario.estilista = ''"
+              @change="cambiarServicio"
             >
               <option disabled value="">Selecciona un servicio</option>
               <option
@@ -265,48 +304,60 @@
           </label>
 
           <label>
-            Estilista
-            <select v-model="formulario.estilista" required>
+            Fecha
+            <input
+              v-model="formulario.fecha"
+              type="date"
+              :min="fechaActual"
+              required
+              @change="cambiarFecha"
+            />
+          </label>
+
+          <label>
+            Estilista y horario
+            <select
+              v-model="formulario.estilista"
+              required
+              :disabled="!formulario.servicio || !formulario.fecha"
+              @change="formulario.horaInicio = ''"
+            >
               <option disabled value="">Selecciona una estilista</option>
               <option
                 v-for="estilista in estilistasDelServicio"
                 :key="estilista._id || estilista.id"
                 :value="estilista._id || estilista.id"
               >
-                {{ estilista.nombre }} {{ estilista.apellido || '' }}
+                {{ estilista.nombre }} ({{ estilista.horasDisponibles.length }} horarios disponibles · {{ estilista.horaInicio }}–{{ estilista.horaFin }})
               </option>
             </select>
           </label>
 
           <p
-            v-if="formulario.servicio && !estilistasDelServicio.length"
+            v-if="formulario.servicio && formulario.fecha && !estilistasDelServicio.length"
             class="error-message"
           >
-            No hay estilistas asignadas a este servicio. Revisa los servicios de cada estilista.
+            No hay estilistas disponibles para ese servicio y fecha.
           </p>
 
-          <div class="form-row">
+          <div v-if="formulario.estilista" class="form-row">
             <label>
-              Fecha
-              <input
-                v-model="formulario.fecha"
-                type="date"
-                :min="fechaActual"
-                required
-              />
-            </label>
-
-            <label>
-              Hora de inicio
-              <input
-                v-model="formulario.horaInicio"
-                type="time"
-                min="07:00"
-                max="21:00"
-                required
-              />
+              Horarios disponibles (cada 15 minutos)
+              <select v-model="formulario.horaInicio" required>
+                <option disabled value="">Selecciona una hora disponible</option>
+                <option
+                  v-for="hora in horasDisponibles"
+                  :key="hora"
+                  :value="hora"
+                >
+                  {{ hora }}
+                </option>
+              </select>
             </label>
           </div>
+          <p v-if="formulario.estilista && !horasDisponibles.length" class="help-text">
+            No hay horarios disponibles. El servicio no cabe en la jornada o todos los horarios se cruzan con otras citas.
+          </p>
 
           <div v-if="servicioSeleccionado" class="price-summary">
             <span>
@@ -359,6 +410,7 @@ const mensaje = ref('')
 const fechaFiltro = ref('')
 const modoCliente = ref('existente')
 const busquedaCliente = ref('')
+const citaActualizandoId = ref('')
 
 function fechaLocal() {
   const hoy = new Date()
@@ -413,22 +465,70 @@ const clientesEncontrados = computed(() => {
 
 const estilistasDelServicio = computed(() => {
   const servicioId = String(formulario.servicio)
-  if (!servicioId) return []
+  if (!servicioId || !formulario.fecha || !servicioSeleccionado.value) return []
 
-  return store.stylists.filter(estilista => {
-    if (estilista.activa === false) return false
+  return store.stylists.flatMap(estilista => {
+    if (estilista.activa === false) return []
 
     const servicios = estilista.servicios
-    if (!Array.isArray(servicios)) return false
+    if (!Array.isArray(servicios)) return []
 
-    return servicios.some(servicio =>
+    const realizaServicio = servicios.some(servicio =>
       String(
         typeof servicio === 'object'
           ? servicio._id || servicio.id
           : servicio,
       ) === servicioId,
     )
+
+    if (!realizaServicio) return []
+
+    const apertura = minutosDelDia(estilista.horaInicio)
+    const cierre = minutosDelDia(estilista.horaFin)
+    const duracion = Number(servicioSeleccionado.value.duracion)
+    if (!Number.isFinite(apertura) || !Number.isFinite(cierre) || duracion <= 0) {
+      return []
+    }
+
+    const idEstilista = String(estilista._id || estilista.id)
+    const ocupadas = store.appointments
+      .filter(cita => {
+        const citaEstilista = cita.estilista?._id || cita.estilista?.id || cita.estilista
+        return String(citaEstilista) === idEstilista
+          && cita.fecha === formulario.fecha
+          && ['agendada', 'confirmada'].includes(cita.estado || 'agendada')
+      })
+      .map(cita => ({
+        inicio: minutosDelDia(cita.horaInicio),
+        fin: minutosDelDia(cita.horaFin),
+      }))
+
+    const ahora = new Date()
+    const horaActual = ahora.getHours() * 60 + ahora.getMinutes()
+    const horariosDisponibles = []
+    for (let inicio = apertura; inicio + duracion <= cierre; inicio += 15) {
+      const fin = inicio + duracion
+      if (
+        formulario.fecha === fechaActual
+        && inicio <= horaActual
+      ) {
+        continue
+      }
+      if (ocupadas.some(cita => inicio < cita.fin && fin > cita.inicio)) continue
+      horariosDisponibles.push(horaDesdeMinutos(inicio))
+    }
+
+    return horariosDisponibles.length
+      ? [{ ...estilista, horasDisponibles: horariosDisponibles }]
+      : []
   })
+})
+
+const horasDisponibles = computed(() => {
+  const estilista = estilistasDelServicio.value.find(
+    item => String(item._id || item.id) === String(formulario.estilista),
+  )
+  return estilista?.horasDisponibles || []
 })
 
 const citasFiltradas = computed(() =>
@@ -445,6 +545,59 @@ function normalizarTelefono(event) {
   const telefono = event.target.value.replace(/\D/g, '').slice(0, 10)
   nuevaClienta.telefono = telefono
   event.target.value = telefono
+}
+
+function minutosDelDia(hora) {
+  if (!/^\d{2}:\d{2}$/.test(hora || '')) return Number.NaN
+  const [horas, minutos] = hora.split(':').map(Number)
+  return horas * 60 + minutos
+}
+
+function horaDesdeMinutos(total) {
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+
+function cambiarServicio() {
+  formulario.estilista = ''
+  formulario.horaInicio = ''
+}
+
+function cambiarFecha() {
+  formulario.estilista = ''
+  formulario.horaInicio = ''
+}
+
+function etiquetaEstado(estado) {
+  return ({
+    agendada: 'Agendada',
+    confirmada: 'Confirmada',
+    cancelada: 'Cancelada',
+    completada: 'Realizada',
+  })[estado] || 'Agendada'
+}
+
+async function cambiarEstadoCita(cita, estado) {
+  const id = cita._id || cita.id
+  if (estado === 'cancelada' && !window.confirm('¿Confirmas que quieres cancelar esta cita?')) {
+    return
+  }
+
+  citaActualizandoId.value = id
+  errorGeneral.value = ''
+  mensaje.value = ''
+  try {
+    await store.updateAppointmentStatus(id, estado)
+    mensaje.value = `La cita ahora figura como ${etiquetaEstado(estado).toLowerCase()}.`
+  } catch (error) {
+    errorGeneral.value = error.message || 'No se pudo actualizar el estado de la cita.'
+    try {
+      await store.loadAll()
+    } catch (refreshError) {
+      errorGeneral.value += ` Tampoco se pudo actualizar la agenda: ${refreshError.message}`
+    }
+  } finally {
+    citaActualizandoId.value = ''
+  }
 }
 
 async function generarCitas() {
@@ -609,6 +762,11 @@ async function guardarCita() {
     return
   }
 
+  if (!horasDisponibles.value.includes(formulario.horaInicio)) {
+    errorFormulario.value = 'Ese horario ya no está disponible. Selecciona otro.'
+    return
+  }
+
   guardando.value = true
 
   try {
@@ -736,6 +894,8 @@ onMounted(() => {
 .primary-button,
 .secondary-button,
 .clear-button {
+  min-width: 0;
+  min-height: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -899,6 +1059,71 @@ tbody tr:hover {
   border-radius: 6px;
   background: #f8e9e9;
   color: #82485b;
+  font-size: 11px;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 6px 9px;
+  border-radius: 20px;
+  background: #f8f1e5;
+  color: #8b6f3c;
+  font-size: 11px;
+}
+
+.status-confirmada,
+.status-completada {
+  background: #e9f3e6;
+  color: #476d46;
+}
+
+.status-cancelada {
+  background: #f9e8e6;
+  color: #a13e36;
+}
+
+.status-select {
+  max-width: 150px;
+  padding: 7px 8px;
+  border: 1px solid #e9dddc;
+  border-radius: 7px;
+  background: #fffdfb;
+  color: #62464e;
+  font: inherit;
+  font-size: 11px;
+}
+
+.status-select:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.status-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reopen-button {
+  padding: 7px 9px;
+  border: 1px solid #d7e7d5;
+  border-radius: 7px;
+  background: #f0f8ed;
+  color: #476d46;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.reopen-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.help-text {
+  margin: 0;
+  color: #9b8589;
   font-size: 11px;
 }
 
