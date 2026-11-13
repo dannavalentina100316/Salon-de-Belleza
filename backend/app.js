@@ -2,10 +2,10 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 
 import { conectarDB } from './database/Conexion.js';
-import Estilista from './models/Estilista.js';
-
 
 import CitaRouter from './routes/CitaRouter.js';
 import ClienteRouter from './routes/ClienteRouter.js';
@@ -18,6 +18,17 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(async (req, res, next) => {
+  try {
+    await conectarDB();
+    next();
+  } catch (error) {
+    console.error('No se pudo conectar con MongoDB:', error.message);
+    res.status(503).json({
+      mensaje: 'No se pudo conectar con la base de datos. Revisa la configuración del servidor.',
+    });
+  }
+});
 
 app.get('/', (req, res) => {
   res.json({
@@ -32,32 +43,23 @@ app.use('/api/clientes', ClienteRouter);
 app.use('/api/estilistas', EstilistaRouter);
 app.use('/api/servicios', ServicioRouter);
 
-const PORT = process.env.PORT || 3000;
+const rutaArchivoActual = fileURLToPath(import.meta.url);
+const ejecutadoDirectamente = process.argv[1]
+  && resolve(process.argv[1]) === rutaArchivoActual;
 
-const eliminarIndiceCorreoObsoleto = async () => {
-  const indexes = await Estilista.collection.indexes();
-  const legacyEmailIndex = indexes.find(index =>
-    index.unique === true
-    && Object.keys(index.key).length === 1
-    && index.key.correo === 1,
-  );
+if (ejecutadoDirectamente) {
+  const PORT = process.env.PORT || 3000;
 
-  if (legacyEmailIndex) {
-    await Estilista.collection.dropIndex(legacyEmailIndex.name);
-    console.log('Índice único obsoleto de correo eliminado de estilistas');
-  }
-};
+  conectarDB()
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`Servidor funcionando en http://localhost:${PORT}`);
+      });
+    })
+    .catch((error) => {
+      console.error('No se pudo iniciar el servidor:', error.message);
+      process.exitCode = 1;
+    });
+}
 
-const iniciarServidor = async () => {
-  await conectarDB();
-  await eliminarIndiceCorreoObsoleto();
-
-  app.listen(PORT, () => {
-    console.log(`Servidor funcionando en http://localhost:${PORT}`);
-  });
-};
-
-iniciarServidor().catch((error) => {
-  console.error('No se pudo iniciar el servidor:', error.message);
-  process.exitCode = 1;
-});
+export default app;
