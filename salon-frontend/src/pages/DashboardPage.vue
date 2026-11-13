@@ -7,9 +7,9 @@
         <h2>La belleza está<br />en cada detalle.</h2>
         <p>Organiza tu salón y brinda una experiencia especial a cada cliente.</p>
 
-        <RouterLink to="/citas" class="welcome-button">
-          Ver agenda <span>→</span>
-        </RouterLink>
+        <BaseButton to="/citas" icon="→" class="welcome-button">
+          Ver agenda
+        </BaseButton>
       </div>
 
       <div class="welcome-art" aria-hidden="true">
@@ -28,16 +28,14 @@
         <h2>Tu espacio de trabajo</h2>
       </div>
 
-      <q-btn
-        class="refresh-button"
-        flat
-        no-caps
-        :ripple="false"
-        :disable="store.loading"
+      <BaseButton
+        variant="secondary"
+        icon="↻"
+        :disabled="store.loading"
         @click="cargarDatos"
       >
-        ↻ Actualizar
-      </q-btn>
+        Actualizar
+      </BaseButton>
     </div>
 
     <p v-if="store.error" class="error-message">
@@ -163,6 +161,7 @@
 import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useSalonStore } from '../stores/salon'
+import BaseButton from '../components/BaseButton.vue'
 
 const store = useSalonStore()
 
@@ -287,25 +286,8 @@ onMounted(cargarDatos)
 }
 
 .welcome-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 20px;
   margin-top: 10px;
-  padding: 12px 18px;
-  border-radius: 8px;
-  background: #82485b;
-  color: white;
   text-decoration: none;
-  font-size: 12px;
-  transition: background 0.2s;
-}
-
-.welcome-button:hover {
-  background: #663748;
-}
-
-.welcome-button span {
-  font-size: 17px;
 }
 
 .welcome-art {
@@ -375,23 +357,6 @@ onMounted(cargarDatos)
   font-family: Georgia, serif;
   font-size: 23px;
   font-weight: normal;
-}
-
-.refresh-button {
-  min-width: 0;
-  min-height: 0;
-  padding: 10px 14px;
-  border: 1px solid #eadbdc;
-  border-radius: 8px;
-  background: #fffdfb;
-  color: #805061;
-  cursor: pointer;
-  box-shadow: none;
-}
-
-.refresh-button:disabled {
-  opacity: 0.6;
-  cursor: wait;
 }
 
 .error-message {

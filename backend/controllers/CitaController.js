@@ -196,14 +196,24 @@ export const actualizarEstadoCita = async (req, res) => {
       });
     }
 
-    const cita = await Cita.findByIdAndUpdate(
-      req.params.id,
+    const cita = await Cita.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        estado: { $nin: ['cancelada', 'completada'] },
+      },
       { estado },
       { new: true, runValidators: true },
     );
 
     if (!cita) {
-      return res.status(404).json({ mensaje: 'No se encontró la cita.' });
+      const citaExistente = await Cita.findById(req.params.id).select('estado');
+      if (!citaExistente) {
+        return res.status(404).json({ mensaje: 'No se encontró la cita.' });
+      }
+
+      return res.status(409).json({
+        mensaje: 'Una cita cancelada o realizada no se puede reabrir ni modificar.',
+      });
     }
 
     return res.status(200).json({

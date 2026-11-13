@@ -8,12 +8,9 @@
         <p>{{ configuracion.descripcion }}</p>
       </div>
 
-        <button class="primary-button" @click="abrirFormulario">
-          + Nuevo registro
-        </button>
+        <BaseButton icon="＋" @click="abrirFormulario">Nuevo registro</BaseButton>
     </section>
 
-    <p v-if="store.error" class="error-message">{{ store.error }}</p>
     <p v-if="errorAccionEstilista" class="error-message">{{ errorAccionEstilista }}</p>
     <p v-if="mensaje" class="success-message">{{ mensaje }}</p>
 
@@ -25,95 +22,106 @@
           <RouterLink to="/servicios">Servicios</RouterLink>
         </div>
 
-        <input
-          v-model="busqueda"
-          type="search"
-          placeholder="Buscar registros..."
-          aria-label="Buscar registros"
-        />
       </div>
 
-      <div v-if="store.loading" class="empty-state">
-        Cargando información...
-      </div>
+      <BaseTable
+        v-model="busqueda"
+        :columns="configuracion.columnas"
+        :rows="registros"
+        :loading="store.loading"
+        :error="store.error"
+        :searchable="true"
+        search-placeholder="Buscar registros..."
+        :empty-description="`Agrega el primer registro de ${configuracion.titulo.toLowerCase()}.`"
+      >
+        <template #cell="{ row, column, value }">
+          <span
+            v-if="column.key === 'estado'"
+            :class="['status', estaActivo(row) ? 'active' : 'inactive']"
+          >
+            {{ estaActivo(row) ? 'Activo' : 'Inactivo' }}
+          </span>
+          <template v-else-if="column.key === 'precio'">
+            {{ mostrarPrecio(row.precio) }}
+          </template>
+          <template v-else>
+            {{ value ?? valorColumna(row, column.key) }}
+          </template>
+        </template>
 
-      <div v-else-if="registrosFiltrados.length" class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th v-for="columna in configuracion.columnas" :key="columna.key">
-                {{ columna.label }}
-              </th>
-              <th v-if="tipo === 'estilistas'">Acciones</th>
-            </tr>
-          </thead>
+        <template #actions="{ row }">
+          <div class="row-actions" :class="{ 'stylist-actions': tipo === 'estilistas' }">
+            <BaseButton
+              v-if="tipo === 'clientes'"
+              variant="secondary"
+              size="small"
+              @click="editarCliente(row)"
+            >
+              Editar
+            </BaseButton>
+            <BaseButton
+              v-else-if="tipo === 'servicios'"
+              variant="secondary"
+              size="small"
+              @click="editarServicio(row)"
+            >
+              Editar
+            </BaseButton>
+            <template v-else>
+              <BaseButton variant="secondary" size="small" @click="editarEstilista(row)">
+                Editar
+              </BaseButton>
+              <BaseButton
+                variant="danger"
+                size="small"
+                :disabled="accionandoEstilista === (row._id || row.id)"
+                @click="eliminarEstilista(row)"
+              >
+                Eliminar
+              </BaseButton>
+              <BaseButton
+                variant="secondary"
+                size="small"
+                :disabled="accionandoEstilista === (row._id || row.id)"
+                @click="alternarEstadoEstilista(row)"
+              >
+                {{ row.activa === false ? 'Activar horario' : 'Desactivar horario' }}
+              </BaseButton>
+              <BaseButton variant="secondary" size="small" @click="verServiciosEstilista(row)">
+                Ver servicios
+              </BaseButton>
+            </template>
+          </div>
+        </template>
 
-          <tbody>
-            <tr v-for="registro in registrosFiltrados"
-                :key="registro._id || registro.id">
-              <td v-for="columna in configuracion.columnas" :key="columna.key">
-                <template v-if="columna.key === 'estado'">
-                  <span :class="['status', estaActivo(registro) ? 'active' : 'inactive']">
-                    {{ estaActivo(registro) ? 'Activo' : 'Inactivo' }}
-                  </span>
-                </template>
-
-                <template v-else-if="columna.key === 'servicios'">
-                  {{ nombresServicios(registro.servicios) }}
-                </template>
-
-                <template v-else-if="columna.key === 'precio'">
-                  {{ mostrarPrecio(registro.precio) }}
-                </template>
-
-                <template v-else>
-                  {{ valorColumna(registro, columna.key) }}
-                </template>
-              </td>
-              <td v-if="tipo === 'estilistas'" class="row-actions">
-                <button type="button" class="table-action" @click="editarEstilista(registro)">
-                  Editar
-                </button>
-                <button
-                  type="button"
-                  class="table-action"
-                  :disabled="accionandoEstilista === (registro._id || registro.id)"
-                  @click="alternarEstadoEstilista(registro)"
-                >
-                  {{ registro.activa === false ? 'Activar' : 'Desactivar' }}
-                </button>
-                <button
-                  type="button"
-                  class="table-action danger-action"
-                  :disabled="accionandoEstilista === (registro._id || registro.id)"
-                  @click="eliminarEstilista(registro)"
-                >
-                  Eliminar
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div v-else class="empty-state">
-        <span class="empty-flower">✿</span>
-        <strong>No hay registros para mostrar</strong>
-        <p>Prueba otra búsqueda o agrega un nuevo registro.</p>
-        <button class="secondary-button" @click="abrirFormulario">
-          Crear registro
-        </button>
-      </div>
+        <template #empty-action>
+          <BaseButton variant="secondary" @click="abrirFormulario">
+            Crear registro
+          </BaseButton>
+        </template>
+      </BaseTable>
     </section>
 
 
-<div v-if="mostrarFormulario" class="modal-backdrop">      <section class="directory-modal">
-        <button class="close-button" type="button" @click="cerrarFormulario">×</button>
+    <div v-if="mostrarFormulario" class="modal-backdrop">
+      <section class="directory-modal">
+        <BaseButton
+          class="close-button"
+          variant="ghost"
+          size="small"
+          aria-label="Cerrar formulario"
+          @click="cerrarFormulario"
+        >
+          ×
+        </BaseButton>
 
         <span class="eyebrow">FLORA STUDIO · REGISTROS</span>
-        <h3>{{ estilistaEditandoId ? 'Editar estilista' : configuracion.formularioTitulo }}</h3>
+        <h3>
+          {{ clienteEditandoId || estilistaEditandoId || servicioEditandoId
+            ? `Editar ${tipo === 'clientes' ? 'cliente' : tipo === 'estilistas' ? 'estilista' : 'servicio'}`
+            : configuracion.formularioTitulo }}
+        </h3>
         <p class="modal-description">{{ configuracion.descripcionFormulario }}</p>
-required 
         <form @submit.prevent="guardarRegistro">
           <!-- FORMULARIO DE CLIENTE -->
           <template v-if="tipo === 'clientes'">
@@ -149,16 +157,6 @@ required
               <input v-model.trim="formulario.correo" type="email" required />
             </label>
 
-            <label>
-              Contraseña de la cuenta
-              <input
-                v-model="formulario.password"
-                type="password"
-                minlength="6"
-                autocomplete="new-password"
-                required
-              />
-            </label>
           </template>
 
           <!-- FORMULARIO DE ESTILISTA -->
@@ -243,12 +241,12 @@ required
 
             <div class="form-row">
               <label>
-                Precio (COP)
+                Precio (pesos colombianos, COP)
                 <input
                   v-model.number="formulario.precio"
                   type="number"
                   min="0"
-                  step="1000"
+                  step="1"
                   required
                 />
               </label>
@@ -259,7 +257,7 @@ required
                   v-model.number="formulario.duracion"
                   type="number"
                   min="1"
-                  step="5"
+                  step="1"
                   required
                 />
               </label>
@@ -276,15 +274,42 @@ required
           </p>
 
           <div class="form-actions">
-            <button type="button" class="secondary-button" @click="cerrarFormulario">
+            <BaseButton variant="secondary" @click="cerrarFormulario">
               Cancelar
-            </button>
+            </BaseButton>
 
-            <button type="submit" class="primary-button" :disabled="guardando">
-              {{ guardando ? 'Guardando...' : estilistaEditandoId ? 'Guardar cambios' : 'Guardar registro' }}
-            </button>
+            <BaseButton type="submit" :loading="guardando">
+              {{ guardando ? 'Guardando...' : (clienteEditandoId || estilistaEditandoId || servicioEditandoId) ? 'Guardar cambios' : 'Guardar registro' }}
+            </BaseButton>
           </div>
         </form>
+      </section>
+    </div>
+
+    <div v-if="estilistaServicios" class="modal-backdrop" @click.self="estilistaServicios = null">
+      <section class="directory-modal services-modal" role="dialog" aria-modal="true">
+        <BaseButton
+          class="close-button"
+          variant="ghost"
+          size="small"
+          aria-label="Cerrar servicios"
+          @click="estilistaServicios = null"
+        >
+          ×
+        </BaseButton>
+        <span class="eyebrow">FLORA STUDIO · EQUIPO</span>
+        <h3>Servicios de {{ estilistaServicios.nombre }}</h3>
+        <p class="modal-description">Servicios que ofrece esta estilista.</p>
+        <ul v-if="serviciosEstilistaSeleccionada.length" class="stylist-service-list">
+          <li v-for="servicio in serviciosEstilistaSeleccionada" :key="servicio._id || servicio.id">
+            <div>
+              <strong>{{ servicio.nombre }}</strong>
+              <p>{{ servicio.descripcion || 'Sin descripción' }}</p>
+            </div>
+            <span>{{ mostrarPrecio(servicio.precio) }}</span>
+          </li>
+        </ul>
+        <p v-else class="empty-state">Esta estilista no tiene servicios asignados.</p>
       </section>
     </div>
   </div>
@@ -294,6 +319,9 @@ required
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useSalonStore } from '../stores/salon'
+import { confirmAction, notify } from '../services/feedback'
+import BaseButton from '../components/BaseButton.vue'
+import BaseTable from '../components/BaseTable.vue'
 
 const props = defineProps({
   tipo: {
@@ -310,19 +338,36 @@ const guardando = ref(false)
 const errorFormulario = ref('')
 const errorAccionEstilista = ref('')
 const mensaje = ref('')
+const clienteEditandoId = ref('')
 const estilistaEditandoId = ref('')
+const servicioEditandoId = ref('')
 const accionandoEstilista = ref('')
+const estilistaServicios = ref(null)
 
 const formulario = reactive({})
+
+const serviciosEstilistaSeleccionada = computed(() => {
+  const serviciosAsignados = estilistaServicios.value?.servicios || []
+  return serviciosAsignados.map(servicio => {
+    if (typeof servicio === 'object') return servicio
+    return store.services.find(
+      item => String(item._id || item.id) === String(servicio),
+    )
+  }).filter(Boolean)
+})
 
 const configuraciones = {
   clientes: {
     titulo: 'Clientes',
     descripcion: 'Consulta y registra las personas que visitan el salón.',
     formularioTitulo: 'Nueva clienta',
-    descripcionFormulario: 'Registra sus datos de contacto y de cuenta.',
+    descripcionFormulario: 'Registra sus datos de contacto.',
     columnas: [
-      { key: 'nombreCompleto', label: 'Nombre' },
+      {
+        key: 'nombreCompleto',
+        label: 'Nombre',
+        value: registro => `${registro.nombre || ''} ${registro.apellido || ''}`.trim(),
+      },
       { key: 'telefono', label: 'Teléfono' },
       { key: 'correo', label: 'Correo electrónico' },
     ],
@@ -335,8 +380,11 @@ const configuraciones = {
     descripcionFormulario: 'Completa su información profesional y disponibilidad.',
     columnas: [
       { key: 'nombre', label: 'Nombre' },
-      { key: 'servicios', label: 'Servicios asignados' },
-      { key: 'horario', label: 'Horario' },
+      {
+        key: 'horario',
+        label: 'Horario',
+        value: registro => `${registro.horaInicio || '—'} - ${registro.horaFin || '—'}`,
+      },
       { key: 'estado', label: 'Estado' },
     ],
   },
@@ -366,25 +414,6 @@ const registros = computed(() => {
   return store.services
 })
 
-const registrosFiltrados = computed(() => {
-  const termino = busqueda.value.trim().toLowerCase()
-
-  if (!termino) return registros.value
-
-  return registros.value.filter(registro => {
-    const texto = [
-      registro.nombre,
-      registro.apellido,
-      registro.telefono,
-      registro.correo,
-      registro.cargo,
-      registro.descripcion,
-    ].join(' ').toLowerCase()
-
-    return texto.includes(termino)
-  })
-})
-
 function limpiarFormulario() {
   Object.keys(formulario).forEach(clave => delete formulario[clave])
 
@@ -394,7 +423,6 @@ function limpiarFormulario() {
       apellido: '',
       telefono: '',
       correo: '',
-      password: '',
     })
   } else if (props.tipo === 'estilistas') {
     Object.assign(formulario, {
@@ -419,15 +447,36 @@ function limpiarFormulario() {
 function abrirFormulario() {
   errorFormulario.value = ''
   mensaje.value = ''
+  clienteEditandoId.value = ''
   estilistaEditandoId.value = ''
+  servicioEditandoId.value = ''
   limpiarFormulario()
+  mostrarFormulario.value = true
+}
+
+function editarCliente(cliente) {
+  errorFormulario.value = ''
+  mensaje.value = ''
+  clienteEditandoId.value = cliente._id || cliente.id
+  estilistaEditandoId.value = ''
+  servicioEditandoId.value = ''
+  limpiarFormulario()
+  Object.assign(formulario, {
+    nombre: cliente.nombre || '',
+    apellido: cliente.apellido || '',
+    telefono: cliente.telefono || '',
+    correo: cliente.correo || '',
+  })
   mostrarFormulario.value = true
 }
 
 function editarEstilista(estilista) {
   errorFormulario.value = ''
   mensaje.value = ''
+  clienteEditandoId.value = ''
   estilistaEditandoId.value = estilista._id || estilista.id
+  servicioEditandoId.value = ''
+  limpiarFormulario()
   Object.assign(formulario, {
     nombre: estilista.nombre || '',
     telefono: estilista.telefono || '',
@@ -441,7 +490,38 @@ function editarEstilista(estilista) {
   mostrarFormulario.value = true
 }
 
+function editarServicio(servicio) {
+  errorFormulario.value = ''
+  mensaje.value = ''
+  clienteEditandoId.value = ''
+  estilistaEditandoId.value = ''
+  servicioEditandoId.value = servicio._id || servicio.id
+  limpiarFormulario()
+  Object.assign(formulario, {
+    nombre: servicio.nombre || '',
+    descripcion: servicio.descripcion || '',
+    precio: Number(servicio.precio) || 0,
+    duracion: Number(servicio.duracion) || 30,
+    activo: servicio.activo !== false,
+  })
+  mostrarFormulario.value = true
+}
+
+function verServiciosEstilista(estilista) {
+  estilistaServicios.value = estilista
+}
+
 async function alternarEstadoEstilista(estilista) {
+  const activar = estilista.activa === false
+  if (!activar) {
+    const confirmado = await confirmAction({
+      title: '¿Desactivar el horario?',
+      message: `El horario de ${estilista.nombre} dejará de estar disponible para nuevas reservas. Podrás activarlo nuevamente después.`,
+      confirmText: 'Desactivar horario',
+    })
+    if (!confirmado) return
+  }
+
   const id = estilista._id || estilista.id
   accionandoEstilista.value = id
   errorAccionEstilista.value = ''
@@ -449,8 +529,10 @@ async function alternarEstadoEstilista(estilista) {
   try {
     await store.toggleStylistStatus(id)
     mensaje.value = `${estilista.nombre} ahora está ${estilista.activa === false ? 'activa' : 'inactiva'}.`
+    notify(mensaje.value, 'success')
   } catch (error) {
     errorAccionEstilista.value = error.message || 'No se pudo cambiar el estado.'
+    notify(errorAccionEstilista.value, 'error')
   } finally {
     accionandoEstilista.value = ''
   }
@@ -458,9 +540,12 @@ async function alternarEstadoEstilista(estilista) {
 
 async function eliminarEstilista(estilista) {
   const id = estilista._id || estilista.id
-  if (!window.confirm(`¿Eliminar a ${estilista.nombre}? No se podrá eliminar mientras tenga citas futuras; las citas anteriores conservarán su registro, pero ya no mostrarán su nombre.`)) {
-    return
-  }
+  const confirmado = await confirmAction({
+    title: `¿Eliminar a ${estilista.nombre}?`,
+    message: 'No se podrá eliminar mientras tenga citas futuras. Las citas anteriores conservarán su registro, pero dejarán de mostrar su nombre.',
+    confirmText: 'Eliminar estilista',
+  })
+  if (!confirmado) return
 
   accionandoEstilista.value = id
   errorAccionEstilista.value = ''
@@ -468,8 +553,10 @@ async function eliminarEstilista(estilista) {
   try {
     await store.deleteStylist(id)
     mensaje.value = `${estilista.nombre} fue eliminada.`
+    notify(mensaje.value, 'success')
   } catch (error) {
     errorAccionEstilista.value = error.message || 'No se pudo eliminar la estilista.'
+    notify(errorAccionEstilista.value, 'error')
   } finally {
     accionandoEstilista.value = ''
   }
@@ -484,18 +571,6 @@ function estaActivo(registro) {
   return props.tipo === 'estilistas'
     ? registro.activa !== false
     : registro.activo !== false
-}
-
-function nombresServicios(servicios) {
-  if (!Array.isArray(servicios) || !servicios.length) return 'Sin servicios asignados'
-
-  return servicios.map(servicio => {
-    if (typeof servicio === 'object') return servicio.nombre || 'Servicio'
-    const encontrado = store.services.find(
-      elemento => String(elemento._id || elemento.id) === String(servicio),
-    )
-    return encontrado?.nombre || 'Servicio'
-  }).join(', ')
 }
 
 function valorColumna(registro, clave) {
@@ -558,10 +633,6 @@ if (props.tipo === 'clientes') {
       return
     }
 
-    if (formulario.password.length < 6) {
-      errorFormulario.value = 'La contraseña debe tener al menos 6 caracteres.'
-      return
-    }
   }
 
   if (props.tipo === 'estilistas') {
@@ -598,17 +669,49 @@ if (props.tipo === 'clientes') {
     }
   }
 
+  if (estilistaEditandoId.value && !formulario.activa) {
+    const estilistaActual = store.stylists.find(
+      estilista => String(estilista._id || estilista.id) === String(estilistaEditandoId.value),
+    )
+    if (estilistaActual?.activa !== false) {
+      const confirmado = await confirmAction({
+        title: '¿Desactivar el horario?',
+        message: `El horario de ${estilistaActual.nombre} dejará de estar disponible para nuevas reservas.`,
+        confirmText: 'Desactivar horario',
+      })
+      if (!confirmado) return
+    }
+  }
+
+  if (servicioEditandoId.value && !formulario.activo) {
+    const servicioActual = store.services.find(
+      servicio => String(servicio._id || servicio.id) === String(servicioEditandoId.value),
+    )
+    if (servicioActual?.activo !== false) {
+      const confirmado = await confirmAction({
+        title: '¿Desactivar el servicio?',
+        message: `${servicioActual.nombre} dejará de estar disponible para nuevas reservas.`,
+        confirmText: 'Desactivar servicio',
+      })
+      if (!confirmado) return
+    }
+  }
+
   guardando.value = true
 
   try {
     if (props.tipo === 'clientes') {
-      await store.createClient({
+      const datosCliente = {
         nombre: formulario.nombre.trim(),
         apellido: formulario.apellido.trim(),
         telefono: formulario.telefono.trim(),
         correo: formulario.correo.trim().toLowerCase(),
-        password: formulario.password,
-      })
+      }
+      if (clienteEditandoId.value) {
+        await store.updateClient(clienteEditandoId.value, datosCliente)
+      } else {
+        await store.createClient(datosCliente)
+      }
     } else if (props.tipo === 'estilistas') {
       const datosEstilista = {
         nombre: formulario.nombre.trim(),
@@ -624,13 +727,18 @@ if (props.tipo === 'clientes') {
         await store.createStylist(datosEstilista)
       }
     } else {
-      await store.createService({
+      const datosServicio = {
         nombre: formulario.nombre.trim(),
         descripcion: formulario.descripcion.trim(),
         precio: formulario.precio,
         duracion: formulario.duracion,
         activo: formulario.activo,
-      })
+      }
+      if (servicioEditandoId.value) {
+        await store.updateService(servicioEditandoId.value, datosServicio)
+      } else {
+        await store.createService(datosServicio)
+      }
     }
 
     cerrarFormulario()
@@ -690,39 +798,6 @@ onMounted(() => {
   line-height: 1.6;
 }
 
-.primary-button,
-.secondary-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px 16px;
-  border: 0;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.primary-button {
-  background: #82485b;
-  color: white;
-}
-
-.primary-button:hover {
-  background: #663748;
-}
-
-.primary-button:disabled {
-  opacity: 0.6;
-  cursor: wait;
-}
-
-.secondary-button {
-  border: 1px solid #eadbdc;
-  background: #fffdfb;
-  color: #805061;
-}
-
 .row-actions {
   display: flex;
   align-items: center;
@@ -730,25 +805,10 @@ onMounted(() => {
   gap: 7px;
 }
 
-.table-action {
-  padding: 6px 8px;
-  border: 1px solid #eadbdc;
-  border-radius: 6px;
-  background: #fffdfb;
-  color: #805061;
-  cursor: pointer;
-  font: inherit;
-  font-size: 11px;
-}
-
-.table-action:disabled {
-  cursor: wait;
-  opacity: 0.6;
-}
-
-.danger-action {
-  border-color: #f0d4cf;
-  color: #a13e36;
+.stylist-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(105px, 1fr));
+  min-width: 245px;
 }
 
 .directory-card {
@@ -785,49 +845,6 @@ onMounted(() => {
 .tabs a.router-link-active {
   background: #f8e9e9;
   font-weight: 600;
-}
-
-.directory-toolbar > input {
-  width: 260px;
-  max-width: 100%;
-  padding: 11px 13px;
-  border: 1px solid #e9dddc;
-  border-radius: 8px;
-  outline: none;
-  color: #503a40;
-}
-
-.directory-toolbar > input:focus {
-  border-color: #b77c8e;
-}
-
-.table-wrapper {
-  width: 100%;
-  overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-}
-
-th {
-  padding: 15px;
-  background: #fcf7f5;
-  color: #9c8288;
-  font-size: 10px;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-td {
-  padding: 16px 15px;
-  border-top: 1px solid #f3ebe8;
-  color: #78666b;
-  font-size: 12px;
-  vertical-align: middle;
 }
 
 .status {
@@ -902,10 +919,43 @@ td {
   font-size: 27px;
 }
 
+.services-modal {
+  max-width: 620px;
+}
+
+.stylist-service-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.stylist-service-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px;
+  border: 1px solid #f0e6e3;
+  border-radius: 9px;
+  background: #fcf7f5;
+  color: #805061;
+  font-size: 12px;
+}
+
+.stylist-service-list p {
+  margin: 5px 0 0;
+  color: #9b8589;
+}
+
 .close-button {
   position: absolute;
   top: 15px;
   right: 17px;
+  min-height: 0;
+  padding: 0;
   border: 0;
   background: transparent;
   color: #947d82;

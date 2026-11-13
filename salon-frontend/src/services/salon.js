@@ -11,6 +11,10 @@ export const salonApi = {
     return api.post('/clientes', data)
   },
 
+  updateClient(id, data) {
+    return api.put(`/clientes/${id}`, data)
+  },
+
   // ESTILISTAS
   getStylists() {
     return api.get('/estilistas')

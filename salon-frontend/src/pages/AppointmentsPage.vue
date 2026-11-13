@@ -9,34 +9,20 @@
       </div>
 
       <div class="heading-actions">
-        <q-btn
-          class="secondary-button"
-          flat
-          no-caps
-          :ripple="false"
-          type="button"
-          :disable="generando"
+        <BaseButton
+          variant="secondary"
+          :disabled="generando"
+          :loading="generando"
           @click="generarCitas"
         >
           {{ generando ? 'Generando citas...' : 'Generar 200 citas de prueba' }}
-        </q-btn>
+        </BaseButton>
 
-        <q-btn
-          class="primary-button"
-          unelevated
-          no-caps
-          :ripple="false"
-          @click="abrirFormulario"
-        >
-          ＋ Nueva cita
-        </q-btn>
+        <BaseButton icon="＋" size="large" @click="abrirFormulario">Nueva cita</BaseButton>
       </div>
     </section>
 
-    <p v-if="store.error" class="error-message">{{ store.error }}</p>
     <p v-if="errorGeneral" class="error-message">{{ errorGeneral }}</p>
-    <p v-if="mensaje" class="success-message">{{ mensaje }}</p>
-
     <section class="summary-grid">
       <article class="summary-card">
         <span class="summary-icon">▦</span>
@@ -71,130 +57,116 @@
         </div>
 
         <div class="filters">
+          <input
+            v-model="busquedaAgenda"
+            type="search"
+            placeholder="Buscar por nombre o cliente"
+            aria-label="Buscar reservas por nombre o cliente"
+          />
           <input v-model="fechaFiltro" type="date" aria-label="Filtrar por fecha" />
-          <button class="clear-button" @click="fechaFiltro = ''">Todas</button>
+          <BaseButton variant="secondary" @click="fechaFiltro = ''">Todas</BaseButton>
         </div>
       </div>
 
-      <div v-if="store.loading" class="empty-state">
-        Cargando citas...
-      </div>
+      <BaseTable
+        :columns="appointmentColumns"
+        :rows="citasFiltradas"
+        :loading="store.loading"
+        :error="store.error"
+        :empty-message="busquedaAgenda ? 'No hay reservas que coincidan con la búsqueda' : fechaFiltro ? 'No hay citas para esta fecha' : 'Tu agenda está esperando nuevas citas'"
+        :empty-description="busquedaAgenda ? 'Prueba con otro nombre de cliente, estilista o servicio.' : fechaFiltro ? 'Selecciona otra fecha o pulsa “Todas”.' : 'Registra una reserva para comenzar a organizar tu jornada.'"
+        actions-label="Actualizar estado"
+      >
+        <template #cell="{ row, column }">
+          <span v-if="column.key === 'fecha'">{{ mostrarFecha(row.fecha) }}</span>
+          <span v-else-if="column.key === 'horario'" class="time-badge">
+            {{ row.horaInicio || '—' }}{{ row.horaFin ? ` - ${row.horaFin}` : '' }}
+          </span>
+          <span v-else-if="['cliente', 'servicio', 'estilista'].includes(column.key)">
+            {{ nombreRelacionado(row[column.key]) }}
+          </span>
+          <span v-else-if="column.key === 'precio'">{{ mostrarPrecio(row.precio) }}</span>
+          <span v-else-if="column.key === 'estado'" :class="['status-badge', `status-${row.estado || 'agendada'}`]">
+            {{ etiquetaEstado(row.estado) }}
+          </span>
+        </template>
 
-      <div v-else-if="citasFiltradas.length" class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Horario</th>
-              <th>Cliente</th>
-              <th>Servicio</th>
-              <th>Estilista</th>
-              <th>Precio</th>
-              <th>Estado</th>
-              <th>Actualizar estado</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            <tr
-              v-for="(cita, index) in citasFiltradas"
-              :key="cita._id || cita.id || index"
+        <template #actions="{ row }">
+          <div class="status-actions">
+            <BaseButton
+              v-if="row.estado === 'cancelada'"
+              variant="success"
+              size="small"
+              @click="abrirFormulario(row)"
             >
-              <td>{{ mostrarFecha(cita.fecha) }}</td>
-              <td>
-                <span class="time-badge">
-                  {{ cita.horaInicio || '—' }}{{ cita.horaFin ? ` - ${cita.horaFin}` : '' }}
-                </span>
-              </td>
-              <td>{{ nombreRelacionado(cita.cliente) }}</td>
-              <td>{{ nombreRelacionado(cita.servicio) }}</td>
-              <td>{{ nombreRelacionado(cita.estilista) }}</td>
-              <td>{{ mostrarPrecio(cita.precio) }}</td>
-              <td>
-                <span :class="['status-badge', `status-${cita.estado || 'agendada'}`]">
-                  {{ etiquetaEstado(cita.estado) }}
-                </span>
-              </td>
-              <td>
-                <div class="status-actions">
-                  <select
-                    class="status-select"
-                    :value="cita.estado || 'agendada'"
-                    :disabled="citaActualizandoId === (cita._id || cita.id)"
-                    aria-label="Cambiar estado de cita"
-                    @change="cambiarEstadoCita(cita, $event.target.value)"
-                  >
-                    <option value="agendada">Agendada</option>
-                    <option value="confirmada">Confirmada</option>
-                    <option value="cancelada">Cancelada</option>
-                    <option value="completada">Realizada</option>
-                  </select>
-                  <button
-                    v-if="['cancelada', 'completada'].includes(cita.estado)"
-                    type="button"
-                    class="reopen-button"
-                    :disabled="citaActualizandoId === (cita._id || cita.id)"
-                    @click="cambiarEstadoCita(cita, 'agendada')"
-                  >
-                    {{ citaActualizandoId === (cita._id || cita.id) ? 'Reabriendo...' : 'Reabrir cita' }}
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+              Reagendar
+            </BaseButton>
+            <span v-else-if="row.estado === 'completada'" class="closed-appointment">
+              Cita cerrada
+            </span>
+            <select
+              v-else
+              class="status-select"
+              :value="row.estado || 'agendada'"
+              :disabled="citaActualizandoId === (row._id || row.id)"
+              aria-label="Cambiar estado de cita"
+              @change="cambiarEstadoCita(row, $event.target.value, $event.target)"
+            >
+              <option value="agendada">Agendada</option>
+              <option value="confirmada">Confirmada</option>
+              <option value="cancelada">Cancelada</option>
+              <option value="completada">Realizada</option>
+            </select>
+          </div>
+        </template>
 
-      <div v-else class="empty-state">
-        <span class="empty-flower">✿</span>
-        <strong>
-          {{ fechaFiltro ? 'No hay citas para esta fecha' : 'Tu agenda está esperando nuevas citas' }}
-        </strong>
-        <p>
-          {{ fechaFiltro
-            ? 'Selecciona otra fecha o pulsa “Todas”.'
-            : 'Registra una reserva para comenzar a organizar tu jornada.' }}
-        </p>
-        <button class="secondary-button" @click="abrirFormulario">
-          Registrar primera cita
-        </button>
-      </div>
+        <template #empty-action>
+          <BaseButton variant="secondary" @click="abrirFormulario">
+            Registrar primera cita
+          </BaseButton>
+        </template>
+      </BaseTable>
     </section>
 
     <div v-if="mostrarFormulario" class="modal-backdrop">
       <section class="booking-modal">
-        <button
+        <BaseButton
           class="close-button"
-          type="button"
+          variant="ghost"
+          size="small"
           aria-label="Cerrar"
           @click="cerrarFormulario"
         >
           ×
-        </button>
+        </BaseButton>
 
         <span class="eyebrow">FLORA STUDIO · RESERVAS</span>
-        <h3>Agendar una cita</h3>
+        <h3>{{ reagendandoCita ? 'Reagendar cita' : 'Agendar una cita' }}</h3>
         <p class="modal-description">
-          Registra una nueva clienta o busca una que ya esté en el sistema.
+          {{ reagendandoCita
+            ? 'Se creará una nueva reserva; la cita cancelada se conservará en el historial.'
+            : 'Registra una nueva clienta o busca una que ya esté en el sistema.' }}
         </p>
 
         <form @submit.prevent="guardarCita">
           <div class="client-mode">
-            <button
+            <BaseButton
               type="button"
+              variant="ghost"
               :class="{ selected: modoCliente === 'existente' }"
               @click="cambiarModoCliente('existente')"
             >
               Buscar clienta
-            </button>
+            </BaseButton>
 
-            <button
+            <BaseButton
               type="button"
+              variant="ghost"
               :class="{ selected: modoCliente === 'nueva' }"
               @click="cambiarModoCliente('nueva')"
             >
               Nueva clienta
-            </button>
+            </BaseButton>
           </div>
 
           <template v-if="modoCliente === 'existente'">
@@ -214,16 +186,18 @@
               v-if="busquedaCliente.trim() && !formulario.cliente"
               class="search-results"
             >
-              <button
+              <BaseButton
                 v-for="cliente in clientesEncontrados"
                 :key="cliente._id || cliente.id"
                 type="button"
+                variant="ghost"
+                size="small"
                 class="search-result"
                 @click="seleccionarCliente(cliente)"
               >
                 <strong>{{ cliente.nombre }} {{ cliente.apellido || '' }}</strong>
                 <small>{{ cliente.telefono || cliente.correo || '' }}</small>
-              </button>
+              </BaseButton>
 
               <p v-if="!clientesEncontrados.length">
                 No encontramos coincidencias. Puedes registrar una nueva clienta.
@@ -232,7 +206,7 @@
 
             <p v-if="formulario.cliente" class="selected-client">
               <span>✓</span> Clienta seleccionada: {{ busquedaCliente }}
-              <button type="button" @click="limpiarCliente">Cambiar</button>
+              <BaseButton type="button" variant="ghost" size="small" @click="limpiarCliente">Cambiar</BaseButton>
             </p>
           </template>
 
@@ -268,21 +242,6 @@
               <input v-model.trim="nuevaClienta.correo" type="email" required />
             </label>
 
-            <label>
-              Contraseña para su cuenta
-              <input
-                v-model="nuevaClienta.password"
-                type="password"
-                minlength="6"
-                autocomplete="new-password"
-                placeholder="Mínimo 6 caracteres"
-                required
-              />
-            </label>
-
-            <p class="modal-description">
-              No utilices una contraseña personal tuya para registrar a la clienta.
-            </p>
           </template>
 
           <label>
@@ -293,6 +252,13 @@
               @change="cambiarServicio"
             >
               <option disabled value="">Selecciona un servicio</option>
+              <option
+                v-if="servicioSeleccionado?.activo === false"
+                :value="formulario.servicio"
+                disabled
+              >
+                {{ servicioSeleccionado.nombre }} (inactivo; selecciona otro)
+              </option>
               <option
                 v-for="servicio in store.services.filter(s => s.activo !== false)"
                 :key="servicio._id || servicio.id"
@@ -372,21 +338,20 @@
           </p>
 
           <div class="form-actions">
-            <button
+            <BaseButton
               type="button"
-              class="secondary-button"
+              variant="secondary"
               @click="cerrarFormulario"
             >
               Cancelar
-            </button>
+            </BaseButton>
 
-            <button
+            <BaseButton
               type="submit"
-              class="primary-button"
-              :disabled="guardando"
+              :loading="guardando"
             >
               {{ guardando ? 'Guardando...' : 'Confirmar cita' }}
-            </button>
+            </BaseButton>
           </div>
         </form>
       </section>
@@ -398,6 +363,9 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useSalonStore } from '../stores/salon'
 import api from '../services/api'
+import { confirmAction } from '../services/feedback'
+import BaseButton from '../components/BaseButton.vue'
+import BaseTable from '../components/BaseTable.vue'
 
 const store = useSalonStore()
 
@@ -406,11 +374,22 @@ const guardando = ref(false)
 const generando = ref(false)
 const errorFormulario = ref('')
 const errorGeneral = ref('')
-const mensaje = ref('')
 const fechaFiltro = ref('')
+const busquedaAgenda = ref('')
 const modoCliente = ref('existente')
 const busquedaCliente = ref('')
 const citaActualizandoId = ref('')
+const reagendandoCita = ref(false)
+
+const appointmentColumns = [
+  { key: 'fecha', label: 'Fecha' },
+  { key: 'horario', label: 'Horario' },
+  { key: 'cliente', label: 'Cliente' },
+  { key: 'servicio', label: 'Servicio' },
+  { key: 'estilista', label: 'Estilista' },
+  { key: 'precio', label: 'Precio' },
+  { key: 'estado', label: 'Estado' },
+]
 
 function fechaLocal() {
   const hoy = new Date()
@@ -435,7 +414,6 @@ const nuevaClienta = reactive({
   apellido: '',
   telefono: '',
   correo: '',
-  password: '',
 })
 
 const servicioSeleccionado = computed(() =>
@@ -465,7 +443,12 @@ const clientesEncontrados = computed(() => {
 
 const estilistasDelServicio = computed(() => {
   const servicioId = String(formulario.servicio)
-  if (!servicioId || !formulario.fecha || !servicioSeleccionado.value) return []
+  if (
+    !servicioId ||
+    !formulario.fecha ||
+    !servicioSeleccionado.value ||
+    servicioSeleccionado.value.activo === false
+  ) return []
 
   return store.stylists.flatMap(estilista => {
     if (estilista.activa === false) return []
@@ -531,15 +514,34 @@ const horasDisponibles = computed(() => {
   return estilista?.horasDisponibles || []
 })
 
-const citasFiltradas = computed(() =>
-  [...store.appointments]
+const citasFiltradas = computed(() => {
+  const termino = busquedaAgenda.value.trim().toLocaleLowerCase()
+
+  return [...store.appointments]
     .filter(cita => !fechaFiltro.value || cita.fecha === fechaFiltro.value)
-    .sort((a, b) =>
-      `${a.fecha || ''} ${a.horaInicio || ''}`.localeCompare(
-        `${b.fecha || ''} ${b.horaInicio || ''}`,
-      ),
-    ),
-)
+    .filter(cita => {
+      if (!termino) return true
+
+      const datosBuscables = [
+        nombreRelacionado(cita.cliente),
+        nombreRelacionado(cita.estilista),
+        nombreRelacionado(cita.servicio),
+      ]
+
+      return datosBuscables.some(dato =>
+        dato.toLocaleLowerCase().includes(termino),
+      )
+    })
+    .sort((a, b) => {
+      const creadoA = new Date(
+        a.createdAt || `${a.fecha || ''}T${a.horaInicio || '00:00'}`,
+      ).getTime()
+      const creadoB = new Date(
+        b.createdAt || `${b.fecha || ''}T${b.horaInicio || '00:00'}`,
+      ).getTime()
+      return creadoB - creadoA
+    })
+})
 
 function normalizarTelefono(event) {
   const telefono = event.target.value.replace(/\D/g, '').slice(0, 10)
@@ -576,18 +578,30 @@ function etiquetaEstado(estado) {
   })[estado] || 'Agendada'
 }
 
-async function cambiarEstadoCita(cita, estado) {
-  const id = cita._id || cita.id
-  if (estado === 'cancelada' && !window.confirm('¿Confirmas que quieres cancelar esta cita?')) {
+async function cambiarEstadoCita(cita, estado, controlEstado) {
+  if (['cancelada', 'completada'].includes(cita.estado)) {
+    errorGeneral.value = 'Las citas canceladas o realizadas no se pueden reabrir.'
+    if (controlEstado) controlEstado.value = cita.estado
     return
+  }
+
+  const id = cita._id || cita.id
+  if (estado === 'cancelada') {
+    const confirmado = await confirmAction({
+      title: '¿Cancelar esta cita?',
+      message: 'La cita quedará cerrada y no podrá modificarse. Si necesitas otra fecha, podrás crear una nueva reserva.',
+      confirmText: 'Cancelar cita',
+    })
+    if (!confirmado) {
+      if (controlEstado) controlEstado.value = cita.estado || 'agendada'
+      return
+    }
   }
 
   citaActualizandoId.value = id
   errorGeneral.value = ''
-  mensaje.value = ''
   try {
     await store.updateAppointmentStatus(id, estado)
-    mensaje.value = `La cita ahora figura como ${etiquetaEstado(estado).toLowerCase()}.`
   } catch (error) {
     errorGeneral.value = error.message || 'No se pudo actualizar el estado de la cita.'
     try {
@@ -603,24 +617,21 @@ async function cambiarEstadoCita(cita, estado) {
 async function generarCitas() {
   if (generando.value) return
 
-  const confirmar = window.confirm(
-    '¿Deseas generar las 200 citas de prueba en la base de datos? Esta acción puede crear registros de prueba.',
-  )
+  const confirmado = await confirmAction({
+  title: '¿Generar citas de prueba?',
+  message: 'Se crearán hasta 200 citas de prueba en la base de datos. Esta acción agregará registros a la agenda.',
+  confirmText: 'Generar citas',
+  tone: 'warning',
+  })
 
-  if (!confirmar) return
+  if (!confirmado) return
 
   generando.value = true
   errorGeneral.value = ''
-  mensaje.value = ''
 
   try {
-    const respuesta = await api.post('/citas/generar-prueba')
+    await api.post('/citas/generar-prueba')
     await store.loadAll()
-
-    mensaje.value =
-      respuesta.data?.mensaje ||
-      respuesta.data?.message ||
-      'La solicitud terminó. Revisa el total de citas en la agenda.'
   } catch (error) {
     errorGeneral.value =
       error.response?.data?.mensaje ||
@@ -632,27 +643,34 @@ async function generarCitas() {
   }
 }
 
-function abrirFormulario() {
+function abrirFormulario(cita = null) {
   errorFormulario.value = ''
   errorGeneral.value = ''
-  mensaje.value = ''
+  reagendandoCita.value = Boolean(cita)
   modoCliente.value = 'existente'
   busquedaCliente.value = ''
 
   Object.assign(formulario, {
-    cliente: '',
-    servicio: '',
+    cliente: cita
+      ? cita.cliente?._id || cita.cliente?.id || cita.cliente || ''
+      : '',
+    servicio: cita
+      ? cita.servicio?._id || cita.servicio?.id || cita.servicio || ''
+      : '',
     estilista: '',
     fecha: '',
     horaInicio: '',
   })
+  if (cita?.cliente && typeof cita.cliente === 'object') {
+    busquedaCliente.value =
+      `${cita.cliente.nombre || ''} ${cita.cliente.apellido || ''}`.trim()
+  }
 
   Object.assign(nuevaClienta, {
     nombre: '',
     apellido: '',
     telefono: '',
     correo: '',
-    password: '',
   })
 
   mostrarFormulario.value = true
@@ -716,7 +734,6 @@ function mostrarPrecio(precio) {
 
 async function guardarCita() {
   errorFormulario.value = ''
-  mensaje.value = ''
 
   if (!formulario.servicio) {
     errorFormulario.value = 'Selecciona un servicio.'
@@ -778,7 +795,6 @@ async function guardarCita() {
         apellido: nuevaClienta.apellido.trim(),
         telefono: nuevaClienta.telefono,
         correo: nuevaClienta.correo.trim().toLowerCase(),
-        password: nuevaClienta.password,
       }
 
       if (!datos.nombre || !datos.apellido || !datos.correo) {
@@ -787,10 +803,6 @@ async function guardarCita() {
 
       if (!/^\d{10}$/.test(datos.telefono)) {
         throw new Error('El teléfono debe tener exactamente 10 dígitos.')
-      }
-
-      if (datos.password.length < 6) {
-        throw new Error('La contraseña debe tener al menos 6 caracteres.')
       }
 
       const resultado = await store.createClient(datos)
@@ -829,7 +841,6 @@ async function guardarCita() {
     })
 
     cerrarFormulario()
-    mensaje.value = 'La cita se registró correctamente.'
     await store.loadAll()
   } catch (error) {
     errorFormulario.value =
@@ -889,44 +900,6 @@ onMounted(() => {
   color: #9b8589;
   font-size: 13px;
   line-height: 1.6;
-}
-
-.primary-button,
-.secondary-button,
-.clear-button {
-  min-width: 0;
-  min-height: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px 16px;
-  border: 0;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 12px;
-}
-
-.primary-button {
-  background: #82485b;
-  color: white;
-}
-
-.primary-button:hover {
-  background: #663748;
-}
-
-.primary-button:disabled,
-.secondary-button:disabled {
-  opacity: 0.6;
-  cursor: wait;
-}
-
-.secondary-button,
-.clear-button {
-  border: 1px solid #eadbdc;
-  background: #fffdfb;
-  color: #805061;
 }
 
 .summary-grid {
@@ -1021,39 +994,6 @@ onMounted(() => {
   font-size: 12px;
 }
 
-.table-wrapper {
-  width: 100%;
-  overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-}
-
-th {
-  padding: 15px;
-  background: #fcf7f5;
-  color: #9c8288;
-  font-size: 10px;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-td {
-  padding: 16px 15px;
-  border-top: 1px solid #f3ebe8;
-  color: #78666b;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-tbody tr:hover {
-  background: #fffbf9;
-}
-
 .time-badge {
   padding: 6px 9px;
   border-radius: 6px;
@@ -1104,21 +1044,9 @@ tbody tr:hover {
   gap: 8px;
 }
 
-.reopen-button {
-  padding: 7px 9px;
-  border: 1px solid #d7e7d5;
-  border-radius: 7px;
-  background: #f0f8ed;
-  color: #476d46;
-  cursor: pointer;
-  font: inherit;
+.closed-appointment {
+  color: #9b8589;
   font-size: 11px;
-  white-space: nowrap;
-}
-
-.reopen-button:disabled {
-  cursor: wait;
-  opacity: 0.6;
 }
 
 .help-text {
@@ -1159,16 +1087,6 @@ tbody tr:hover {
   border-radius: 8px;
   background: #fff0ed;
   color: #a13e36;
-  font-size: 12px;
-}
-
-.success-message {
-  margin: 15px 0;
-  padding: 12px;
-  border: 1px solid #d7e7d5;
-  border-radius: 8px;
-  background: #f0f8ed;
-  color: #476d46;
   font-size: 12px;
 }
 
@@ -1352,11 +1270,8 @@ tbody tr:hover {
   font-size: 12px;
 }
 
-.selected-client button {
+.selected-client .base-button {
   border: 0;
-  background: transparent;
-  color: #82485b;
-  cursor: pointer;
   text-decoration: underline;
 }
 

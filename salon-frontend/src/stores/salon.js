@@ -55,6 +55,12 @@ export const useSalonStore = defineStore('salon', {
       return result
     },
 
+    async updateClient(id, data) {
+      const result = await salonApi.updateClient(id, data)
+      await this.loadAll()
+      return result
+    },
+
     async createStylist(data) {
       const result = await salonApi.createStylist(data)
       await this.loadAll()

@@ -1,5 +1,7 @@
 
+import mongoose from 'mongoose';
 import Estilista from '../models/Estilista.js';
+import Servicio from '../models/Servicio.js';
 import Cita from '../models/Cita.js';
 
 function fechaLocalISO() {
@@ -14,12 +16,53 @@ function fechaLocalISO() {
 // Crear un estilista
 export const crearEstilista = async (req, res) => {
   try {
-    const estilista = new Estilista(req.body);
+    const { nombre, telefono, servicios, horaInicio, horaFin, activa } = req.body;
+
+    if (!nombre?.trim() || !horaInicio || !horaFin) {
+      return res.status(400).json({
+        mensaje: 'Completa el nombre y el horario de la estilista.',
+      });
+    }
+
+    if (!Array.isArray(servicios) || servicios.length === 0) {
+      return res.status(400).json({
+        mensaje: 'Selecciona al menos un servicio para la estilista.',
+      });
+    }
+
+    if (servicios.some(id => !mongoose.isValidObjectId(id))) {
+      return res.status(400).json({
+        mensaje: 'Uno o más servicios seleccionados no tienen un identificador válido. Actualiza la página e inténtalo de nuevo.',
+      });
+    }
+
+    const serviciosExistentes = await Servicio.countDocuments({
+      _id: { $in: servicios },
+    });
+
+    if (serviciosExistentes !== new Set(servicios.map(String)).size) {
+      return res.status(400).json({
+        mensaje: 'Uno o más servicios seleccionados ya no existen. Actualiza la página y vuelve a seleccionarlos.',
+      });
+    }
+
+    const estilista = new Estilista({
+      nombre: nombre.trim(),
+      telefono: telefono?.trim() || undefined,
+      servicios,
+      horaInicio,
+      horaFin,
+      activa,
+    });
     await estilista.save();
 
     res.status(201).json(estilista);
   } catch (error) {
-    res.status(400).json({ mensaje: 'Error al crear estilista' });
+    console.error('Error al crear estilista:', error);
+    const mensaje = error.name === 'ValidationError'
+      ? Object.values(error.errors).map(errorCampo => errorCampo.message).join(' ')
+      : 'No se pudo guardar la estilista. Revisa la conexión con la base de datos e inténtalo de nuevo.';
+    res.status(400).json({ mensaje });
   }
 };
 
