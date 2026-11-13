@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: salon-belleza-api
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: MONGODB_URI
+        sync: false

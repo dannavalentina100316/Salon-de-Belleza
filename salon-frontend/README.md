@@ -33,11 +33,13 @@ Node.js 20.19+ (o 22.12+) y npm.
 
 La variable `VITE_API_URL` se incorpora al bundle del navegador y no debe contener secretos. Las credenciales de MongoDB permanecen solo en el `.env` del backend.
 
-## Desplegar en Vercel
+## Desplegar el backend en Render y el frontend en Vercel
 
-1. Importa el repositorio como un proyecto Vercel y configura **Root Directory** como `salon-frontend`.
-2. Usa el framework preset **Vite**. Los comandos por defecto son `npm run build` y `dist`; `vercel.json` configura el fallback de Vue Router para abrir directamente `/citas`, `/clientes`, `/equipo` y `/servicios`.
-3. Cuando la API ya esté desplegada, agrega `VITE_API_URL=https://<dominio-api>/api` en **Settings > Environment Variables** para Production.
-4. Vuelve a desplegar el frontend después de cambiar `VITE_API_URL`, ya que Vite incorpora esa variable durante el build.
+1. En Render, crea un **Blueprint** desde este repositorio. Render detectará el archivo `render.yaml` de la raíz y preparará la API usando la carpeta `backend`.
+2. Al crear el servicio, Render solicitará el valor secreto `MONGODB_URI`. Agrégalo en el formulario o en **Environment** del servicio; nunca lo guardes en GitHub ni en el código.
+3. Espera a que termine el despliegue del backend y copia su dominio HTTPS, por ejemplo `https://salon-belleza-api.onrender.com`.
+4. En Vercel, configura **Root Directory** como `salon-frontend` y usa el preset **Vite**. Los comandos son `npm run build` y `dist`.
+5. En **Settings > Environment Variables** del proyecto de Vercel, configura `VITE_API_URL` con la URL del backend seguida de `/api`, por ejemplo `https://salon-belleza-api.onrender.com/api`.
+6. Vuelve a desplegar el frontend después de configurar `VITE_API_URL`, porque Vite incorpora esa variable durante el build.
 
-El orden recomendado es desplegar primero el frontend para obtener su URL, luego el backend configurando `CORS_ORIGIN` con esa URL, y por último configurar `VITE_API_URL` y volver a desplegar el frontend. El `.env.example` solo es una plantilla; no subas valores secretos.
+El backend permite solicitudes CORS para que el frontend de Vercel pueda consumir la API. El archivo `.env` se usa solo para desarrollo local y permanece excluido de Git; `MONGODB_URI` debe configurarse como variable secreta en Render.
